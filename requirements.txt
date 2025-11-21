@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+streamlit
+requests
+pdfplumber
+pandas
+openpyxl
+nltk==3.8.1
+python-multipart
