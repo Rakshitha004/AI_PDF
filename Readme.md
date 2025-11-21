@@ -46,4 +46,4 @@ nltk.download("punkt_tab")
 
 Including row numbering, aligned columns, and clean headers.
 
-Streamlit Cloud:1)	https://ai-pdf-tool.streamlit.app/
+Streamlit Cloud:https://ai-pdf-tool.streamlit.app/
