@@ -1,20 +1,34 @@
 import pdfplumber
 
-def extract_text_from_pdf(pdf_file):
+def extract_text_from_pdf(pdf_path):
     """
-    Extracts raw text from any PDF file.
-    Works for multi-page PDFs.
-    Returns a single string containing all text.
+    Extracts text from ANY PDF file in the cleanest possible way.
+    Handles:
+    - multi-page PDFs
+    - broken lines
+    - hyphenated text
+    - weird spacing
+    - unicode issues
     """
-    full_text = ""
 
-    # Open PDF using pdfplumber
-    with pdfplumber.open(pdf_file) as pdf:
+    final_text = ""
+
+    with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
-            text = page.extract_text()
+            raw = page.extract_text() or ""
+            final_text += "\n" + raw
 
-            # Some PDFs may have empty pages or strange formatting
-            if text:
-                full_text += text + "\n"
+    # Cleaning unwanted characters
+    final_text = final_text.replace("­", "")   # soft hyphen
+    final_text = final_text.replace("-\n", "") # broken words
+    final_text = final_text.replace("\xa0", " ") # weird spaces
 
-    return full_text.strip()  # Final clean text
+    # Strip extra blank lines
+    cleaned_lines = []
+    for line in final_text.split("\n"):
+        stripped = line.strip()
+        if stripped:
+            cleaned_lines.append(stripped)
+
+    return "\n".join(cleaned_lines)
+

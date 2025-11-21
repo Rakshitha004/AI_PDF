@@ -1,91 +1,33 @@
 import streamlit as st
-import pdfplumber
-import pandas as pd
-import nltk
-import io
-import re
+import os
+import tempfile
+import sys
 
-# NLTK requirements
-nltk.download("punkt")
-nltk.download("punkt_tab")
+root = os.path.dirname(os.path.dirname(__file__))
+sys.path.append(root)
 
+from pipeline import run_pipeline
 
-# ------------------------------------------
-# 1. PDF → TEXT
-# ------------------------------------------
-def extract_text_from_pdf(file):
-    text = ""
-    with pdfplumber.open(file) as pdf:
-        for page in pdf.pages:
-            text += page.extract_text() + "\n"
-    return text
+st.set_page_config(page_title="AI PDF Extractor", layout="wide")
 
+st.title("📄 AI PDF → Excel Extractor")
 
-# ------------------------------------------
-# 2. CLEAN TEXT + SPLIT SENTENCES
-# ------------------------------------------
-def preprocess_text(text):
-    text = re.sub(r"\s+", " ", text).strip()
-    sentences = nltk.sent_tokenize(text)
-    return sentences
-
-
-# ------------------------------------------
-# 3. EXTRACT KEY–VALUE FROM SENTENCE
-# Very simple placeholder logic (customize later)
-# ------------------------------------------
-def extract_kv(sentence):
-    if ":" in sentence:
-        key, value = sentence.split(":", 1)
-        return key.strip(), value.strip(), ""
-    return sentence, "", ""
-
-
-# ------------------------------------------
-# 4. BUILD EXCEL FILE
-# ------------------------------------------
-def build_excel(rows):
-    df = pd.DataFrame(rows, columns=["Field Name", "Extracted Value", "Comments"])
-    df.index += 1
-    df.index.name = "#"
-
-    output = io.BytesIO()
-    df.to_excel(output, engine="openpyxl")
-    return output.getvalue()
-
-
-# ------------------------------------------
-# STREAMLIT UI
-# ------------------------------------------
-st.set_page_config(page_title="AI PDF → Excel", page_icon="📄")
-
-st.title("📄 AI PDF → Structured Excel Generator")
-st.write("Upload a PDF and get a clean Excel sheet instantly.")
-
-uploaded_pdf = st.file_uploader("Upload your PDF", type=["pdf"])
+uploaded_pdf = st.file_uploader("Upload PDF", type=["pdf"])
 
 if uploaded_pdf:
+    st.info("Processing your PDF... ⏳")
 
-    st.info("Processing your document...")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(uploaded_pdf.read())
+        pdf_path = tmp.name
 
-    # PDF → text
-    raw_text = extract_text_from_pdf(uploaded_pdf)
+    output_path = os.path.join(tempfile.gettempdir(), "Extracted_Output.xlsx")
 
-    # text → sentences
-    sentences = preprocess_text(raw_text)
+    run_pipeline(pdf_path, output_path)
 
-    # extract KV pairs
-    rows = [extract_kv(s) for s in sentences]
+    st.success("Done! Download below 👇")
 
-    # build excel
-    excel_file = build_excel(rows)
+    with open(output_path, "rb") as f:
+        st.download_button("📥 Download Excel", f, "Extracted_Output.xlsx")
 
-    st.success("Excel generated successfully!")
-
-    st.download_button(
-        label="⬇️ Download Excel",
-        data=excel_file,
-        file_name="output.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
 

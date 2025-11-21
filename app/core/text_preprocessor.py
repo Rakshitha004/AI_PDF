@@ -1,43 +1,16 @@
-import re
 import nltk
+import re
 
-# Download punkt tokenizer only once
-nltk.download('punkt')
+def preprocess_text(raw):
+    nltk.download("punkt", quiet=True)
+    nltk.download("punkt_tab", quiet=True)
 
-def clean_text(text: str) -> str:
-    """
-    Basic normalization of extracted text.
-    Removes extra spaces, fixes line breaks, etc.
-    """
-    # Replace multiple spaces with one
-    text = re.sub(r'\s+', ' ', text)
-    
-    # Replace weird line breaks
-    text = text.replace("\n ", " ").replace(" \n", " ").replace("\n", " ")
+    # Remove junk chars
+    cleaned = re.sub(r"\s+", " ", raw)
 
-    return text.strip()
+    # Smart sentence splitter
+    sentences = nltk.sent_tokenize(cleaned)
 
+    # Each sentence = one line for extraction
+    return [s.strip() for s in sentences if len(s.strip()) > 2]
 
-def split_into_sentences(text: str):
-    """
-    Splits cleaned text into proper sentences.
-    This uses NLTK's robust sentence tokenizer, suitable for ANY PDF content.
-    """
-    sentences = nltk.sent_tokenize(text)
-    
-    # Additional cleaning: remove empty sentences
-    sentences = [s.strip() for s in sentences if s.strip()]
-
-    return sentences
-
-
-def preprocess_text(raw_text: str):
-    """
-    Full preprocessing pipeline:
-    - Clean raw text
-    - Split into sentences
-    Returns a list of clean, meaningful sentences.
-    """
-    cleaned = clean_text(raw_text)
-    sentences = split_into_sentences(cleaned)
-    return sentences

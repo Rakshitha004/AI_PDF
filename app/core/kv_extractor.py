@@ -1,64 +1,29 @@
 import re
 
-def extract_key_value(sentence: str):
-    """
-    Generic Key-Value extraction.
-    Works for ANY PDF because:
-    - It uses common language patterns
-    - Falls back to storing full sentence as value if no key found
-    """
+COMMON_FIELDS = [
+    "Name", "First Name", "Last Name", "Age", "Gender", "Date of Birth", "DOB",
+    "Blood Group", "City", "State", "Nationality", "Email", "Phone",
+    "Address", "Experience", "Education", "Degree", "Graduation Year",
+    "Company", "Position", "Salary", "Certification"
+]
 
-    original = sentence.strip()
+def guess_key_value(line):
+    line = line.strip()
 
-    # Common patterns like:
-    # "He was born on...", "His age is...", "He joined as...", "He scored..."
-    patterns = [
-        r'(.+?) was born on (.+)', 
-        r'(.+?) is (.+)',
-        r'(.+?) was (.+)',
-        r'(.+?) are (.+)',
-        r'(.+?) were (.+)',
-        r'(.+?) has (.+)',
-        r'(.+?) have (.+)',
-        r'(.+?) includes (.+)',
-        r'(.+?) earned (.+)',
-        r'(.+?) achieved (.+)',
-        r'(.+?) joined (.+)'
-    ]
+    # Case 1: "Key: Value"
+    match = re.match(r"(.+?)\s*[:\-]\s*(.+)", line)
+    if match:
+        return match.group(1).strip(), match.group(2).strip()
 
-    for pattern in patterns:
-        match = re.match(pattern, sentence, re.IGNORECASE)
-        if match:
-            key = match.group(1).strip()
-            value = match.group(2).strip()
-            return key, value, original
+    # Case 2: Try matching known fields at start
+    for f in COMMON_FIELDS:
+        if line.lower().startswith(f.lower()):
+            return f, line[len(f):].strip(" :-")
 
-    # If sentence contains a colon → strong indicator of key-value
-    if ":" in sentence:
-        parts = sentence.split(":", 1)
-        key = parts[0].strip()
-        value = parts[1].strip()
-        return key, value, original
+    # Case 3: Try pattern like "Born on XX"
+    dob_match = re.search(r"\b\d{1,2}-\w{3}-\d{2,4}\b", line)
+    if dob_match:
+        return "Date of Birth", dob_match.group()
 
-    # Default fallback: treat entire sentence as value
-    return "Information", original, original
-
-
-def convert_sentences_to_rows(sentences):
-    """
-    Convert list of sentences into rows:
-    Key, Value, Comments
-    Always preserves original text.
-    """
-
-    rows = []
-
-    for sent in sentences:
-        key, value, comments = extract_key_value(sent)
-        rows.append({
-            "Key": key,
-            "Value": value,
-            "Comments": comments
-        })
-
-    return rows
+    # Case 4: No key–value found
+    return "", line
