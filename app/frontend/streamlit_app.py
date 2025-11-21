@@ -1,102 +1,91 @@
 import streamlit as st
-import requests
-import base64
+import pdfplumber
+import pandas as pd
+import nltk
+import io
+import re
 
-API_URL = "http://127.0.0.1:8000/process-pdf"
+# NLTK requirements
+nltk.download("punkt")
+nltk.download("punkt_tab")
 
-# ----- PAGE CONFIG -----
-st.set_page_config(
-    page_title="AI PDF → Excel Structurer",
-    page_icon="📄",
-    layout="wide"
-)
 
-# ----- CUSTOM CSS -----
-st.markdown("""
-    <style>
-        .main-container {
-            background-color: #f8f9fa;
-            padding: 40px 80px;
-            border-radius: 12px;
-            box-shadow: 0px 0px 12px rgba(0,0,0,0.08);
-        }
-        .title {
-            font-size: 38px !important;
-            font-weight: 700 !important;
-            text-align: center;
-            color: #222;
-        }
-        .sub-text {
-            text-align: center;
-            font-size: 17px;
-            color: #555;
-        }
-        .status-box {
-            padding: 15px 20px;
-            background: #eef2ff;
-            border-left: 5px solid #4f46e5;
-            font-size: 16px;
-            border-radius: 6px;
-            margin-top: 20px;
-        }
-        .success-box {
-            padding: 15px 20px;
-            background: #e8fce8;
-            border-left: 5px solid #16a34a;
-            font-size: 16px;
-            border-radius: 6px;
-            margin-top: 20px;
-        }
-        .error-box {
-            padding: 15px 20px;
-            background: #fde8e8;
-            border-left: 5px solid #dc2626;
-            font-size: 16px;
-            border-radius: 6px;
-            margin-top: 20px;
-        }
-    </style>
-""", unsafe_allow_html=True)
+# ------------------------------------------
+# 1. PDF → TEXT
+# ------------------------------------------
+def extract_text_from_pdf(file):
+    text = ""
+    with pdfplumber.open(file) as pdf:
+        for page in pdf.pages:
+            text += page.extract_text() + "\n"
+    return text
 
-# ----- UI -----
-st.markdown("<div class='main-container'>", unsafe_allow_html=True)
 
-st.markdown("<div class='title'>📄 AI PDF → Structured Excel Generator</div>", unsafe_allow_html=True)
-st.markdown("<p class='sub-text'>Upload any PDF and get a clean, structured Excel output instantly.</p>", unsafe_allow_html=True)
+# ------------------------------------------
+# 2. CLEAN TEXT + SPLIT SENTENCES
+# ------------------------------------------
+def preprocess_text(text):
+    text = re.sub(r"\s+", " ", text).strip()
+    sentences = nltk.sent_tokenize(text)
+    return sentences
 
-uploaded_pdf = st.file_uploader("Upload your PDF file", type=["pdf"])
+
+# ------------------------------------------
+# 3. EXTRACT KEY–VALUE FROM SENTENCE
+# Very simple placeholder logic (customize later)
+# ------------------------------------------
+def extract_kv(sentence):
+    if ":" in sentence:
+        key, value = sentence.split(":", 1)
+        return key.strip(), value.strip(), ""
+    return sentence, "", ""
+
+
+# ------------------------------------------
+# 4. BUILD EXCEL FILE
+# ------------------------------------------
+def build_excel(rows):
+    df = pd.DataFrame(rows, columns=["Field Name", "Extracted Value", "Comments"])
+    df.index += 1
+    df.index.name = "#"
+
+    output = io.BytesIO()
+    df.to_excel(output, engine="openpyxl")
+    return output.getvalue()
+
+
+# ------------------------------------------
+# STREAMLIT UI
+# ------------------------------------------
+st.set_page_config(page_title="AI PDF → Excel", page_icon="📄")
+
+st.title("📄 AI PDF → Structured Excel Generator")
+st.write("Upload a PDF and get a clean Excel sheet instantly.")
+
+uploaded_pdf = st.file_uploader("Upload your PDF", type=["pdf"])
 
 if uploaded_pdf:
-    st.markdown("<div class='status-box'>🔍 Processing your document...</div>", unsafe_allow_html=True)
 
-    files = {"file": (uploaded_pdf.name, uploaded_pdf, "application/pdf")}
+    st.info("Processing your document...")
 
-    try:
-        response = requests.post(API_URL, files=files)
+    # PDF → text
+    raw_text = extract_text_from_pdf(uploaded_pdf)
 
-        if response.status_code == 200:
-            # Success
-            excel_bytes = response.content
+    # text → sentences
+    sentences = preprocess_text(raw_text)
 
-            st.markdown("<div class='success-box'>✅ Excel generated successfully!</div>", unsafe_allow_html=True)
+    # extract KV pairs
+    rows = [extract_kv(s) for s in sentences]
 
-            # Download button
-            st.download_button(
-                label="⬇️ Download Excel File",
-                data=excel_bytes,
-                file_name="output.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        else:
-            st.markdown(
-                f"<div class='error-box'>❌ Error: {response.text}</div>",
-                unsafe_allow_html=True
-            )
+    # build excel
+    excel_file = build_excel(rows)
 
-    except Exception as e:
-        st.markdown(
-            f"<div class='error-box'>⚠️ Connection Error: {str(e)}</div>",
-            unsafe_allow_html=True
-        )
+    st.success("Excel generated successfully!")
 
-st.markdown("</div>", unsafe_allow_html=True)
+    st.download_button(
+        label="⬇️ Download Excel",
+        data=excel_file,
+        file_name="output.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
